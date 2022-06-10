@@ -92,6 +92,9 @@ interface ISecondaryMarketFees {
     uint256 value;
     }
 
+    function owner() external returns(address);
+    function isDeputyOwner(address user) external returns(bool);
+
     function mint(
         uint256 tokenId,
         address to,
@@ -135,6 +138,9 @@ interface ISecondaryMarketFees {
     address recipient;
     uint256 value;
     }
+
+    function owner() external returns(address);
+    function isDeputyOwner(address user) external returns(bool);
 
     function mint(address to,
         uint256 id,
@@ -518,6 +524,8 @@ contract Marketplace {
             validateEthTransfer(order.buyAsset.value, buyerFee);
         }
  
+        require(order.seller == MintNft1155Collection(_mint.contractAddress).owner() 
+        || MintNft1155Collection(_mint.contractAddress).isDeputyOwner(order.seller),"Only Admin can sell");
 
         MintNft1155Collection(_mint.contractAddress)
         .mint( _mint.to, _mint.id , _mint.amount, _mint.data,  _mint._uri, _mint.fees);
@@ -584,6 +592,9 @@ contract Marketplace {
         if (order.buyAsset.assetType == AssetType.ETH) {
             validateEthTransfer(order.buyAsset.value, buyerFee);
         }
+
+        require(order.seller == MintNft721Collection(_mint.contractAddress).owner() 
+        || MintNft721Collection(_mint.contractAddress).isDeputyOwner(order.seller),"Only Admin can sell");
  
         MintNft721Collection(_mint.contractAddress)
         .mint( _mint.tokenId , _mint.to, _mint._fees ,_mint.uri);
