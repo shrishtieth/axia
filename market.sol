@@ -2,7 +2,7 @@
 
 // This version supports ETH and ERC20
 pragma solidity 0.8.9;
-import "./SafeErc20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 
 interface IERC721 {
     function transferFrom(
@@ -65,7 +65,7 @@ interface ISecondaryMarketFees {
         returns (uint256[] memory);
 }
 
-interface MintNft721{
+    interface MintNft721{
     struct Fee {
     address recipient;
     uint256 value;
@@ -84,9 +84,25 @@ interface MintNft721{
     )
     external;
 
-}
+    } 
 
-interface MintNft1155{
+    interface MintNft721Collection{
+    struct Fee {
+    address recipient; 
+    uint256 value;
+    }
+
+    function mint(
+        uint256 tokenId,
+        address to,
+        Fee[] memory _fees,
+        string memory uri
+    ) external;
+
+
+    } 
+
+    interface MintNft1155{
     struct Fee {
     address recipient;
     uint256 value;
@@ -112,7 +128,24 @@ interface MintNft1155{
 
     external;
 
-}
+    }
+
+    interface MintNft1155Collection{
+    struct Fee {
+    address recipient;
+    uint256 value;
+    }
+
+    function mint(address to,
+        uint256 id,
+        uint256 amount,
+        bytes memory data,
+        string memory _uri,
+        Fee[] memory fees
+    ) external;
+
+
+    }
 
 contract Marketplace {
     using SafeERC20 for IERC20;
@@ -161,6 +194,26 @@ contract Marketplace {
         MintNft1155.Signature adminSignature;
         uint256 customNonce;
     
+
+    }
+
+    struct Mint1155Collection{
+        address to;
+        uint256 id;
+        uint256 amount;
+        bytes data;
+        string  _uri;
+        MintNft1155Collection.Fee[] fees;
+        address contractAddress;
+
+    }
+
+    struct Mint721Collection{
+        uint256 tokenId;
+        address to;
+        MintNft721Collection.Fee[] _fees;
+        string uri;
+        address contractAddress;
 
     }
 
@@ -421,7 +474,141 @@ contract Marketplace {
         emitBuy(order, buyer);
     }
 
-    function transferFeeToBeneficiary(
+    function exchangeAndMint1155Collection(
+        Order calldata order,
+        Signature calldata sellerSignature,
+        Signature calldata buyerSignature,
+        address buyer,
+        uint256 sellerFee,
+        uint256 buyerFee,
+        uint256 buyerCustomNonce,
+        uint256 sellerCustomNonce,
+        Mint1155Collection memory _mint
+    ) public payable {
+        if (buyer == address(0)) buyer = msg.sender;
+
+        validateSellerSignature(
+            order,
+            sellerFee,
+            sellerSignature,
+            sellerCustomNonce
+        );
+        validateBuyerSignature(
+            order,
+            buyer,
+            buyerFee,
+            buyerSignature,
+            buyerCustomNonce
+        );
+
+        require(
+            order.sellAsset.assetType == AssetType.ERC721, 
+            "Only ERC721 are supported on seller side"
+        );
+        require(
+            order.buyAsset.assetType == AssetType.ETH ||
+                order.buyAsset.assetType == AssetType.ERC20,
+            "Only Eth/ERC20 supported on buy side"
+        );
+        require(
+            order.buyAsset.tokenId == 0,
+            "Buy token id must be UINT256_MAX"
+        );
+        if (order.buyAsset.assetType == AssetType.ETH) {
+            validateEthTransfer(order.buyAsset.value, buyerFee);
+        }
+ 
+
+        MintNft1155Collection(_mint.contractAddress)
+        .mint( _mint.to, _mint.id , _mint.amount, _mint.data,  _mint._uri, _mint.fees);
+
+        uint256 remainingAmount = transferFeeToBeneficiary(
+            order.buyAsset,
+            buyer,
+            order.buyAsset.value,
+            sellerFee,
+            buyerFee
+        );
+
+        transfer(order.sellAsset, order.seller, buyer, order.sellAsset.value);
+        transferWithFee(
+            order.buyAsset,
+            buyer,
+            order.seller,
+            remainingAmount,
+            order.sellAsset
+        );
+        emitBuy(order, buyer);
+    }
+
+    function exchangeAndMint721Collection(
+        Order calldata order,
+        Signature calldata sellerSignature,
+        Signature calldata buyerSignature,
+        address buyer,
+        uint256 sellerFee,
+        uint256 buyerFee,
+        uint256 buyerCustomNonce,
+        uint256 sellerCustomNonce,
+        Mint721Collection memory _mint
+    ) public payable {
+        if (buyer == address(0)) buyer = msg.sender;
+
+        validateSellerSignature(
+            order,
+            sellerFee,
+            sellerSignature,
+            sellerCustomNonce
+        ); 
+        validateBuyerSignature(
+            order,
+            buyer,
+            buyerFee,
+            buyerSignature,
+            buyerCustomNonce
+        );
+
+        require(
+            order.sellAsset.assetType == AssetType.ERC721, 
+            "Only ERC721 are supported on seller side"
+        );
+        require(
+            order.buyAsset.assetType == AssetType.ETH ||
+                order.buyAsset.assetType == AssetType.ERC20,
+            "Only Eth/ERC20 supported on buy side"
+        );
+        require(
+            order.buyAsset.tokenId == 0,
+            "Buy token id must be UINT256_MAX"
+        );
+        if (order.buyAsset.assetType == AssetType.ETH) {
+            validateEthTransfer(order.buyAsset.value, buyerFee);
+        }
+ 
+        MintNft721Collection(_mint.contractAddress)
+        .mint( _mint.tokenId , _mint.to, _mint._fees ,_mint.uri);
+
+        uint256 remainingAmount = transferFeeToBeneficiary(
+            order.buyAsset,
+            buyer,
+            order.buyAsset.value,
+            sellerFee,
+            buyerFee
+        );
+
+        transfer(order.sellAsset, order.seller, buyer, order.sellAsset.value);
+        transferWithFee(
+            order.buyAsset,
+            buyer,
+            order.seller,
+            remainingAmount,
+            order.sellAsset
+        );
+        emitBuy(order, buyer);
+    }
+
+
+    function transferFeeToBeneficiary( 
         Asset memory asset,
         address from,
         uint256 amount,
