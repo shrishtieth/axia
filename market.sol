@@ -758,7 +758,7 @@ contract Marketplace {
     function getMessageForSeller(
         Order calldata order,
         uint256 sellerFee,
-        uint256 buyerCustomNonce
+        uint256 sellerCustomNonce
     ) public view returns (bytes32) {
         return
             keccak256(
@@ -767,7 +767,7 @@ contract Marketplace {
                     address(this),
                     order,
                     sellerFee,
-                    buyerCustomNonce
+                    sellerCustomNonce
                 )
             );
     }
