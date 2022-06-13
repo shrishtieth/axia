@@ -114,7 +114,7 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
         bool isActive;
         bool sold;
         uint256 startTime;
-        uint256 typeOfMint;
+    
     }
     // mapping to fetch auction details using auction id
     mapping(uint256 => Auction) public idToAuction;
@@ -128,8 +128,7 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
         uint256 startTime,
         bool isActive,
         uint256 reservePrice,
-        bool sold,
-        uint256 typeOfMint
+        bool sold
     );
 
     event BidPlaced(uint256 indexed auctionId, address bidder, uint256 amount);
@@ -150,13 +149,10 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
         emit SetTreasury(_treasury);
     }
 
-    function onERC721Received(
-        address,
-        uint256,
-        bytes memory
-    ) public virtual override returns (bytes4) {
+    function onERC721Received(address, address, uint256, bytes memory) public virtual override returns (bytes4) {
         return this.onERC721Received.selector;
     }
+
 
     /* Places an auction for sale on the marketplace */
     function createAuction(
@@ -164,10 +160,8 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
         uint256 tokenId,
         uint256 price,
         uint256 startIn,
-        uint256 duration,
-        uint256 typeOfMint, // 0 means minted, 1 means custom nft and 2 means custom nft collection 
-        Mint memory _mint,
-        Mint721Collection memory _mintCollection
+        uint256 duration
+        
     ) external nonReentrant {
         require(nftContract != address(0), "zero address cannot be an input");
         require(price > 0, "Price must be at least 1 wei");
@@ -188,18 +182,8 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
             bidType: BidType.OnChain,
             isActive: true,
             sold: false,
-            startTime: startTime,
-            typeOfMint: typeOfMint
+            startTime: startTime
         });
-
-        if(typeOfMint==1){
-          mintDetails721[auctionId] = _mint;
-        }
-        else if(typeOfMint ==2){
-          mintDetails721Collection[auctionId] = _mintCollection;
-        }
-        
-
 
         emit AuctionCreated(
             auctionId,
@@ -210,8 +194,7 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
             startTime,
             true,
             price,
-            false,
-            typeOfMint
+            false
         );
     }
 
@@ -332,7 +315,9 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
     }
 
     //function to end auction
-    function endAuction(uint256 _auctionId) public {
+    function endAuction(uint256 _auctionId, uint256 typeOfMint, // 0 means minted, 1 means custom nft and 2 means custom nft collection 
+        Mint memory _mint,
+        Mint721Collection memory _mintCollection) public {
         require(_auctionId <= _auctionIds.current(), " Enter a valid Id");
         Auction storage auction = idToAuction[_auctionId];
         require(
@@ -348,24 +333,28 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
         );
         require(auction.isActive = true, "Auction is not active");
         auction.isActive = false;
-        if(idToAuction[_auctionId].typeOfMint == 1){
-            Mint memory _mint = mintDetails721[_auctionId];
+        if(typeOfMint == 1){
             MintNft721(MintContract721)
             .mint(_mint.tokenId, _mint.to, _mint.v, _mint.r, _mint.s,
             _mint._fees, _mint.uri, _mint.customNonce);
 
         }
-        else if(idToAuction[_auctionId].typeOfMint == 2){
-
-            Mint721Collection memory _mint = mintDetails721Collection[_auctionId];
-            require(idToAuction[_auctionId].seller == MintNft721Collection(_mint.contractAddress).owner() 
-            || MintNft721Collection(_mint.contractAddress).
+        else if(typeOfMint == 2){
+        
+            require(idToAuction[_auctionId].seller == 
+            MintNft721Collection(_mintCollection.contractAddress).owner() 
+            || MintNft721Collection(_mintCollection.contractAddress).
             isDeputyOwner(idToAuction[_auctionId].seller),"Only Admin can sell");
  
-             MintNft721Collection(_mint.contractAddress)
-             .mint( _mint.tokenId , _mint.to, _mint._fees ,_mint.uri);
+             MintNft721Collection(_mintCollection.contractAddress)
+             .mint( _mintCollection.tokenId , _mintCollection.to, _mintCollection._fees ,_mintCollection.uri);
             
         }
+
+        require(IERC721(auction.nftContract).ownerOf(
+                auction.tokenId
+            ) == auction.seller,"Seller is not the owner of token ID");
+        
         if (auction.amount == 0 && auction.bidType == BidType.OnChain) {
             auction.sold = false;
         } else {
