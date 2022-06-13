@@ -165,7 +165,7 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
         uint256 price,
         uint256 startIn,
         uint256 duration,
-        uint256 typeOfMint,
+        uint256 typeOfMint, // 0 means minted, 1 means custom nft and 2 means custom nft collection 
         Mint memory _mint,
         Mint721Collection memory _mintCollection
     ) external nonReentrant {
@@ -402,15 +402,7 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
             transferFundsToLastBidder(_auctionId);
         }
         auction.sold = false;
-        IERC721(auction.nftContract).approve(
-            0x0000000000000000000000000000000000000000,
-            auction.tokenId
-        );
-        IERC721(auction.nftContract).safeTransferFrom(
-            address(this),
-            auction.seller,
-            auction.tokenId
-        );
+    
         _auctionsInactive.increment();
         emit AuctionCancelled(_auctionId);
     }
