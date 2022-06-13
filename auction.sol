@@ -348,19 +348,19 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
         );
         require(auction.isActive = true, "Auction is not active");
         auction.isActive = false;
-        if(auctionId.typeOfMint == 1){
-
+        if(idToAuction[_auctionId].typeOfMint == 1){
             Mint memory _mint = mintDetails721[_auctionId];
             MintNft721(MintContract721)
             .mint(_mint.tokenId, _mint.to, _mint.v, _mint.r, _mint.s,
             _mint._fees, _mint.uri, _mint.customNonce);
 
         }
-        else if(auctionId.typeOfMint == 2){
+        else if(idToAuction[_auctionId].typeOfMint == 2){
 
             Mint721Collection memory _mint = mintDetails721Collection[_auctionId];
-            require(auction .seller == MintNft721Collection(_mint.contractAddress).owner() 
-            || MintNft721Collection(_mint.contractAddress).isDeputyOwner(order.seller),"Only Admin can sell");
+            require(idToAuction[_auctionId].seller == MintNft721Collection(_mint.contractAddress).owner() 
+            || MintNft721Collection(_mint.contractAddress).
+            isDeputyOwner(idToAuction[_auctionId].seller),"Only Admin can sell");
  
              MintNft721Collection(_mint.contractAddress)
              .mint( _mint.tokenId , _mint.to, _mint._fees ,_mint.uri);
