@@ -59,8 +59,6 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
     Counters.Counter private _auctionsInactive;
     uint256 treasuryRoyalty = 2;
     address payable treasury; // treaasury to transfer listing price
-    mapping(uint256 => Mint) public mintDetails721;
-    mapping(uint256 => Mint721Collection) public mintDetails721Collection;
     address public MintContract721;
 
     enum BidType {
@@ -149,9 +147,14 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
         emit SetTreasury(_treasury);
     }
 
-    function onERC721Received(address, address, uint256, bytes memory) public virtual override returns (bytes4) {
+    function onERC721Received(
+        address,
+        uint256,
+        bytes memory
+    ) public virtual override returns (bytes4) {
         return this.onERC721Received.selector;
     }
+
 
 
     /* Places an auction for sale on the marketplace */
@@ -345,7 +348,7 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
             MintNft721Collection(_mintCollection.contractAddress).owner() 
             || MintNft721Collection(_mintCollection.contractAddress).
             isDeputyOwner(idToAuction[_auctionId].seller),"Only Admin can sell");
- 
+
              MintNft721Collection(_mintCollection.contractAddress)
              .mint( _mintCollection.tokenId , _mintCollection.to, _mintCollection._fees ,_mintCollection.uri);
             
