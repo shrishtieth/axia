@@ -318,7 +318,7 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
     }
 
     //function to end auction
-    function endAuction(uint256 _auctionId, uint256 typeOfMint, // 0 means minted, 1 means custom nft and 2 means custom nft collection 
+        function endAuction(uint256 _auctionId, uint256 typeOfMint, // 0 means minted, 1 means custom nft and 2 means custom nft collection 
         Mint memory _mint,
         Mint721Collection memory _mintCollection) public {
         require(_auctionId <= _auctionIds.current(), " Enter a valid Id");
@@ -336,32 +336,33 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
         );
         require(auction.isActive = true, "Auction is not active");
         auction.isActive = false;
-        if(typeOfMint == 1){
-            MintNft721(MintContract721)
-            .mint(_mint.tokenId, _mint.to, _mint.v, _mint.r, _mint.s,
-            _mint._fees, _mint.uri, _mint.customNonce);
-
-        }
-        else if(typeOfMint == 2){
-        
-            require(idToAuction[_auctionId].seller == 
-            MintNft721Collection(_mintCollection.contractAddress).owner() 
-            || MintNft721Collection(_mintCollection.contractAddress).
-            isDeputyOwner(idToAuction[_auctionId].seller),"Only Admin can sell");
-
-             MintNft721Collection(_mintCollection.contractAddress)
-             .mint( _mintCollection.tokenId , _mintCollection.to, _mintCollection._fees ,_mintCollection.uri);
-            
-        }
-
-        require(IERC721(auction.nftContract).ownerOf(
-                auction.tokenId
-            ) == auction.seller,"Seller is not the owner of token ID");
         
         if (auction.amount == 0 && auction.bidType == BidType.OnChain) {
             auction.sold = false;
         } else {
             auction.sold = true;
+            if(typeOfMint == 1){
+            MintNft721(MintContract721)
+            .mint(_mint.tokenId, _mint.to, _mint.v, _mint.r, _mint.s,
+            _mint._fees, _mint.uri, _mint.customNonce);
+
+             }
+              else if(typeOfMint == 2){
+        
+            require(idToAuction[_auctionId].seller == 
+            MintNft721Collection(_mintCollection.contractAddress).owner() 
+            || MintNft721Collection(_mintCollection.contractAddress).
+            isDeputyOwner(idToAuction[_auctionId].seller),"Only Admin can sell");
+ 
+             MintNft721Collection(_mintCollection.contractAddress)
+             .mint( _mintCollection.tokenId , _mintCollection.to, _mintCollection._fees ,_mintCollection.uri);
+            
+            }
+
+        require(IERC721(auction.nftContract).ownerOf(
+                auction.tokenId
+            ) == auction.seller,"Seller is not the owner of token ID");
+            
             IERC721(auction.nftContract).safeTransferFrom(
                 auction.seller,
                 auction.bidder,
@@ -375,6 +376,7 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
         _auctionsInactive.increment();
         emit AuctionEnded(_auctionId);
     }
+
 
     //function to cancel auction
     function cancelAuction(uint256 _auctionId) external {
