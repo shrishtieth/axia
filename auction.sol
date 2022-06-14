@@ -169,6 +169,7 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
     }
 
 
+
     /* Places an auction for sale on the marketplace */
     function createAuction(
         address nftContract,
@@ -354,20 +355,32 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
 
     // function to place bid
     function placeBidAndRecord(AuctionDetails memory details,
-     Signature calldata _sig, uint256 customNonce) public payable nonReentrant {
+     Signature calldata _sig, Signature calldata _sigSeller, 
+     uint256 customNonce, uint256 sellerNonce) public payable nonReentrant {
       
         bytes32 message = getMessageForBidAndRecord(
             details.nftContract, details.tokenId
         , details.price, details.startTime, details.duration, details.seller,
             customNonce
         );
+        bytes32 messageSeller = getMessageForBidAndRecord(
+            details.nftContract, details.tokenId
+        , details.price, details.startTime, details.duration, details.seller,
+            sellerNonce
+        );
         require(
             getSigner(message, _sig) == owner(),
             "Admin must sign off-chain bid"
         );
+        require(
+            getSigner(messageSeller, _sigSeller) == details.seller,
+            "Seller must sign the message"
+        );
 
         require(!isNonceUsed[owner()][customNonce], "Nonce is already used");
         isNonceUsed[owner()][customNonce] = true;
+        require(!isNonceUsed[details.seller][sellerNonce], "Nonce is already used by seller");
+        isNonceUsed[details.seller][sellerNonce] = true;
         uint256 _auctionId = createAuction(details.nftContract, details.tokenId
         , details.price, details.startTime, details.duration, details.seller);
 
