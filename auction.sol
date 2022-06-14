@@ -114,6 +114,19 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
         uint256 startTime;
     
     }
+
+    struct AuctionDetails{
+
+        address nftContract;
+        uint256 tokenId;
+        uint256 price;
+        uint256 startTime;
+        uint256 duration;
+        address seller;
+
+    }
+
+
     // mapping to fetch auction details using auction id
     mapping(uint256 => Auction) public idToAuction;
 
@@ -156,22 +169,78 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
     }
 
 
-
     /* Places an auction for sale on the marketplace */
     function createAuction(
         address nftContract,
         uint256 tokenId,
         uint256 price,
         uint256 startIn,
-        uint256 duration
+        uint256 duration,
+        address seller
         
-    ) external nonReentrant {
+    ) private nonReentrant returns(uint256){
         require(nftContract != address(0), "zero address cannot be an input");
         require(price > 0, "Price must be at least 1 wei");
         _auctionIds.increment();
         uint256 auctionId = _auctionIds.current();
 
-        uint256 startTime = block.timestamp + startIn;
+        uint256 startTime = startIn;
+
+        idToAuction[auctionId] = Auction({
+            auctionId: auctionId,
+            nftContract: nftContract,
+            tokenId: tokenId,
+            amount: 0,
+            duration: duration,
+            reservePrice: price,
+            seller: payable(seller),
+            bidder: payable(address(0)),
+            bidType: BidType.OnChain,
+            isActive: true,
+            sold: false,
+            startTime: startTime
+        });
+
+        emit AuctionCreated(
+            auctionId,
+            nftContract,
+            tokenId,
+            seller,
+            duration,
+            startTime,
+            true,
+            price,
+            false
+        );
+        return(auctionId);
+    }
+
+    function createAuctionWithSign(
+        address nftContract,
+        uint256 tokenId,
+        uint256 price,
+        uint256 startIn,
+        uint256 duration,
+        Signature calldata _sig, uint256 customNonce
+        
+    ) external nonReentrant returns(uint256){
+        require(nftContract != address(0), "zero address cannot be an input");
+        require(price > 0, "Price must be at least 1 wei");
+        bytes32 message = getMessageForBidAndRecord(
+           nftContract, tokenId, price, startIn, duration, msg.sender,
+            customNonce
+        );
+        require(
+            getSigner(message, _sig) == owner(),
+            "Admin must sign off-chain bid"
+        );
+
+        require(!isNonceUsed[owner()][customNonce], "Nonce is already used");
+        isNonceUsed[owner()][customNonce] = true;
+        _auctionIds.increment();
+        uint256 auctionId = _auctionIds.current();
+
+        uint256 startTime = startIn;
 
         idToAuction[auctionId] = Auction({
             auctionId: auctionId,
@@ -199,6 +268,7 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
             price,
             false
         );
+        return(auctionId);
     }
 
 
@@ -245,6 +315,30 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
             );
     }
 
+     function getMessageForBidAndRecord(
+        address nftContract,
+        uint256 tokenId,
+        uint256 price,
+        uint256 startIn,
+        uint256 duration,
+        address seller,
+        uint256 customNonce
+    ) public view returns (bytes32) {
+        return
+            keccak256(
+                abi.encode(
+                    getChainID(),
+                    nftContract,
+                    tokenId,
+                    price,
+                    startIn,
+                    duration,
+                    seller,
+                    customNonce
+                )
+            );
+    }
+
     function getSigner(bytes32 _message, Signature memory _sig)
         public
         pure
@@ -261,8 +355,26 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
     }
 
     // function to place bid
-    function placeBid(uint256 _auctionId) public payable nonReentrant {
+    function placeBidAndRecord(AuctionDetails memory details,
+     Signature calldata _sig, uint256 customNonce) public payable nonReentrant {
+      
+        bytes32 message = getMessageForBidAndRecord(
+            details.nftContract, details.tokenId
+        , details.price, details.startTime, details.duration, details.seller,
+            customNonce
+        );
+        require(
+            getSigner(message, _sig) == owner(),
+            "Admin must sign off-chain bid"
+        );
+
+        require(!isNonceUsed[owner()][customNonce], "Nonce is already used");
+        isNonceUsed[owner()][customNonce] = true;
+        uint256 _auctionId = createAuction(details.nftContract, details.tokenId
+        , details.price, details.startTime, details.duration, details.seller);
+
         Auction storage auction = idToAuction[_auctionId];
+
         _validAuction(_auctionId);
         _onGoingAuction(_auctionId);
         _sellerCannotBid(_auctionId);
@@ -317,8 +429,29 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
         emit BidPlaced(_auctionId, _buyer, 0);
     }
 
+    function placeBid(uint256 _auctionId) public payable nonReentrant {
+        Auction storage auction = idToAuction[_auctionId];
+        _validAuction(_auctionId);
+        _onGoingAuction(_auctionId);
+        _sellerCannotBid(_auctionId);
+
+        if (auction.amount == 0) {
+            require(msg.value >= auction.reservePrice, "Place a higher bid");
+        } else {
+            require(msg.value > auction.amount, "Place a higher bid");
+            if (auction.bidType == BidType.OnChain) {
+                transferFundsToLastBidder(_auctionId);
+            }
+        }
+
+        auction.bidType = BidType.OnChain;
+        auction.bidder = payable(msg.sender);
+        auction.amount = msg.value;
+        emit BidPlaced(_auctionId, msg.sender, msg.value);
+    }
+
     //function to end auction
-        function endAuction(uint256 _auctionId, uint256 typeOfMint, // 0 means minted, 1 means custom nft and 2 means custom nft collection 
+    function endAuction(uint256 _auctionId, uint256 typeOfMint, // 0 means minted, 1 means custom nft and 2 means custom nft collection 
         Mint memory _mint,
         Mint721Collection memory _mintCollection) public {
         require(_auctionId <= _auctionIds.current(), " Enter a valid Id");
@@ -376,7 +509,6 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
         _auctionsInactive.increment();
         emit AuctionEnded(_auctionId);
     }
-
 
     //function to cancel auction
     function cancelAuction(uint256 _auctionId) external {
