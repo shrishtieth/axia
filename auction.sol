@@ -118,7 +118,6 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
     struct AuctionDetails{
 
         address nftContract;
-        uint256 tokenId;
         uint256 price;
         uint256 startTime;
         uint256 duration;
@@ -165,8 +164,7 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
         uint256,
         bytes memory
     ) public virtual override returns (bytes4) {
-        return this.onERC721Received.selector;
-    }
+        return 
 
 
 
@@ -226,7 +224,7 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
         
     ) external nonReentrant returns(uint256){
         require(nftContract != address(0), "zero address cannot be an input");
-        bytes32 message = getMessageForBidAndRecord(
+        bytes32 message = getMessageForCreateAuction(
            nftContract, tokenId, price, startIn, duration, msg.sender,
             customNonce
         );
@@ -316,6 +314,28 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
 
      function getMessageForBidAndRecord(
         address nftContract,
+        uint256 price,
+        uint256 startIn,
+        uint256 duration,
+        address seller,
+        uint256 customNonce
+    ) public view returns (bytes32) {
+        return
+            keccak256(
+                abi.encode(
+                    getChainID(),
+                    nftContract,
+                    price,
+                    startIn,
+                    duration,
+                    seller,
+                    customNonce
+                )
+            );
+    }
+
+    function getMessageForCreateAuction(
+        address nftContract,
         uint256 tokenId,
         uint256 price,
         uint256 startIn,
@@ -338,6 +358,7 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
             );
     }
 
+
     function getSigner(bytes32 _message, Signature memory _sig)
         public
         pure
@@ -359,12 +380,12 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
      uint256 customNonce, uint256 sellerNonce) public payable nonReentrant {
       
         bytes32 message = getMessageForBidAndRecord(
-            details.nftContract, details.tokenId
+            details.nftContract
         , details.price, details.startTime, details.duration, details.seller,
             customNonce
         );
         bytes32 messageSeller = getMessageForBidAndRecord(
-            details.nftContract, details.tokenId
+            details.nftContract
         , details.price, details.startTime, details.duration, details.seller,
             sellerNonce
         );
@@ -381,7 +402,7 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
         isNonceUsed[owner()][customNonce] = true;
         require(!isNonceUsed[details.seller][sellerNonce], "Nonce is already used by seller");
         isNonceUsed[details.seller][sellerNonce] = true;
-        uint256 _auctionId = createAuction(details.nftContract, details.tokenId
+        uint256 _auctionId = createAuction(details.nftContract, 0
         , details.price, details.startTime, details.duration, details.seller);
 
         Auction storage auction = idToAuction[_auctionId];
