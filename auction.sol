@@ -225,7 +225,6 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
         
     ) external nonReentrant returns(uint256){
         require(nftContract != address(0), "zero address cannot be an input");
-        require(price > 0, "Price must be at least 1 wei");
         bytes32 message = getMessageForBidAndRecord(
            nftContract, tokenId, price, startIn, duration, msg.sender,
             customNonce
@@ -240,7 +239,6 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
         _auctionIds.increment();
         uint256 auctionId = _auctionIds.current();
 
-        uint256 startTime = startIn;
 
         idToAuction[auctionId] = Auction({
             auctionId: auctionId,
@@ -254,7 +252,7 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
             bidType: BidType.OnChain,
             isActive: true,
             sold: false,
-            startTime: startTime
+            startTime: startIn
         });
 
         emit AuctionCreated(
@@ -263,7 +261,7 @@ contract NFTAuction is IERC721Receiver, ReentrancyGuard, Ownable {
             tokenId,
             msg.sender,
             duration,
-            startTime,
+            startIn,
             true,
             price,
             false
