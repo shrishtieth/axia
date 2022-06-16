@@ -163,6 +163,7 @@ contract Marketplace {
     address public MintContract1155;
 
     mapping(address => mapping(uint256 => bool)) public isNonceUsed;
+    mapping(uint256 => bool) public saltUsed;
 
     enum AssetType {
         ETH,
@@ -724,11 +725,15 @@ contract Marketplace {
             getSigner(signature, _sig) == _order.seller,
             "Seller must sign order data"
         );
+        if(!saltUsed[_order.salt]){
         require(
             !isNonceUsed[_order.seller][sellerCustomNonce],
             "Nonce is already used"
         );
+        saltUsed[_order.salt] = true;
         isNonceUsed[_order.seller][sellerCustomNonce] = true;
+        }
+        
     }
 
     function validateBuyerSignature(
